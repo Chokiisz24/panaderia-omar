@@ -4,6 +4,15 @@ import { Form, Button, Card, Alert, Container, Row, Col, ListGroup, Badge } from
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${API_BASE}/api`;
 
+// 💡 Valores por defecto forzados por si la base de datos aún tiene '1' guardado
+const LOTES_POR_DEFECTO = {
+  'Masa Baguette': 15,
+  'Brioche': 5.5,
+  'Pizza': 10,
+  'Biga': 10,
+  'Brioche Caja': 20
+};
+
 export function RegistroProduccion() {
   const [recetas, setRecetas] = useState([]);
   const [ingredientes, setIngredientes] = useState([]);
@@ -41,9 +50,10 @@ export function RegistroProduccion() {
     const seleccion = recetas.find((r) => r.id === parseInt(id));
     setRecetaObjeto(seleccion || null);
 
-    // Asigna por defecto el lote total de la receta seleccionada (ej. 15 para Baguette, 10 para Pizza)
-    if (seleccion && seleccion.total_recetas) {
-      setCantidad(parseFloat(seleccion.total_recetas));
+    if (seleccion) {
+      // 💡 Prioriza el diccionario manual de lotes si existe, si no usa el de la BD o 1
+      const loteDefecto = LOTES_POR_DEFECTO[seleccion.nombre] || seleccion.total_recetas || 1;
+      setCantidad(parseFloat(loteDefecto));
     } else {
       setCantidad(1);
     }
@@ -54,16 +64,13 @@ export function RegistroProduccion() {
     if (!recetaObjeto) return;
 
     try {
-      // Obtener el total_recetas base para calcular la cantidad unitaria
-      const baseTotalRecetas = parseFloat(recetaObjeto.total_recetas || 1);
+      const baseTotalRecetas = parseFloat(LOTES_POR_DEFECTO[recetaObjeto.nombre] || recetaObjeto.total_recetas || 1);
 
       // 1. Recorrer los ingredientes de la receta y descontar stock prorrateado
       for (const item of recetaObjeto.ingredientes) {
         const ingActual = ingredientes.find((i) => i.id === item.ingrediente_id);
         if (ingActual) {
-          // Cantidad por 1 sola receta unitaria
           const cantidadUnitaria = parseFloat(item.cantidad_requerida) / baseTotalRecetas;
-          // Descuento total basado en las recetas elegidas en el input
           const descuento = cantidadUnitaria * parseFloat(cantidad || 0);
           const nuevoStock = parseFloat(ingActual.stock_actual) - descuento;
 
@@ -152,9 +159,8 @@ export function RegistroProduccion() {
                       <ListGroup variant="flush">
                         {recetaObjeto.ingredientes.map((item) => {
                           const detalle = getDetalleIngrediente(item.ingrediente_id);
-                          const baseTotalRecetas = parseFloat(recetaObjeto.total_recetas || 1);
+                          const baseTotalRecetas = parseFloat(LOTES_POR_DEFECTO[recetaObjeto.nombre] || recetaObjeto.total_recetas || 1);
                           
-                          // Cálculo unitario exacto por receta individual
                           const cantidadUnitaria = parseFloat(item.cantidad_requerida) / baseTotalRecetas;
                           const totalRequerido = cantidadUnitaria * parseFloat(cantidad || 0);
 
