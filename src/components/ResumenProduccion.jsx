@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Container, Form, Row, Col, Badge, Button, Alert } from 'react-bootstrap';
+import { Card, Container, Form, Row, Col, Badge, Button, Alert, Modal, Spinner } from 'react-bootstrap';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${API_BASE}/api`;
@@ -13,6 +13,12 @@ export function ResumenProduccion() {
   const [resumen, setResumen] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+
+  // Estados para la ventana/modal de edición
+  const [itemAEditar, setItemAEditar] = useState(null);
+  const [nuevaCantidad, setNuevaCantidad] = useState('');
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false);
+  const [mensajeEdicion, setMensajeEdicion] = useState('');
 
   const cargarResumen = async () => {
     try {
@@ -28,7 +34,6 @@ export function ResumenProduccion() {
       const data = await res.json();
 
       if (Array.isArray(data)) {
-        // Filtramos para mostrar únicamente lo que se haya producido en el día
         setResumen(data);
       } else {
         console.error('La API no devolvió un array:', data);
@@ -48,8 +53,56 @@ export function ResumenProduccion() {
     cargarResumen();
   }, [fecha]);
 
+  // Abrir modal de edición
+  const handleAbrirEdicion = (item) => {
+    setItemAEditar(item);
+    setNuevaCantidad(item.total_producido);
+    setMensajeEdicion('');
+  };
+
+  // Cerrar modal de edición
+  const handleCerrarEdicion = () => {
+    setItemAEditar(null);
+    setNuevaCantidad('');
+    setMensajeEdicion('');
+  };
+
+  // Enviar cambios al servidor
+  const handleGuardarCambios = async (e) => {
+    e.preventDefault();
+    if (!itemAEditar) return;
+
+    setGuardandoEdicion(true);
+    setMensajeEdicion('');
+
+    try {
+      const res = await fetch(`${API_URL}/produccion/actualizar`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receta_id: itemAEditar.receta_id,
+          fecha: fecha,
+          nueva_cantidad: parseFloat(nuevaCantidad)
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('No se pudo actualizar el registro.');
+      }
+
+      // Cerrar modal y recargar lista
+      handleCerrarEdicion();
+      await cargarResumen();
+    } catch (err) {
+      console.error('Error al actualizar producción:', err);
+      setMensajeEdicion(err.message || 'Error al guardar los cambios.');
+    } finally {
+      setGuardandoEdicion(false);
+    }
+  };
+
   return (
-    <Container className="px-1">
+    <Container className="px-1 py-2">
       {/* Selector de fecha */}
       <Card className="shadow-sm border-0 mb-3 bg-white">
         <Card.Body className="p-3">
@@ -98,9 +151,20 @@ export function ResumenProduccion() {
                   <Card className="shadow-sm border-0 border-start border-4 border-primary">
                     <Card.Body className="p-3 d-flex justify-content-between align-items-center">
                       <h6 className="fw-bold mb-0">{item.nombre}</h6>
-                      <Badge bg="primary" className="fs-6 px-3 py-2">
-                        {producido}
-                      </Badge>
+                      
+                      <div className="d-flex align-items-center gap-2">
+                        <Badge bg="primary" className="fs-6 px-3 py-2">
+                          {producido}
+                        </Badge>
+                        <Button
+                          variant="outline-secondary"
+                          size="sm"
+                          onClick={() => handleAbrirEdicion(item)}
+                          title="Editar cantidad"
+                        >
+                          ✏️
+                        </Button>
+                      </div>
                     </Card.Body>
                   </Card>
                 </Col>
@@ -108,6 +172,53 @@ export function ResumenProduccion() {
             })}
         </Row>
       )}
+
+      {/* ✏️ MODAL PARA EDITAR CANTIDAD */}
+      <Modal show={!!itemAEditar} onHide={handleCerrarEdicion} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="h5 mb-0 fw-bold">
+            Editar Producción: {itemAEditar?.nombre}
+          </Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleGuardarCambios}>
+          <Modal.Body className="py-3">
+            {mensajeEdicion && (
+              <Alert variant="danger" className="py-2 small mb-3">
+                {mensajeEdicion}
+              </Alert>
+            )}
+
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-bold">Cantidad producida / Batches:</Form.Label>
+              <Form.Control
+                type="number"
+                min="0"
+                step="0.1"
+                value={nuevaCantidad}
+                onChange={(e) => setNuevaCantidad(e.target.value)}
+                required
+                disabled={guardandoEdicion}
+                autoFocus
+              />
+            </Form.Group>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={handleCerrarEdicion} disabled={guardandoEdicion}>
+              Cancelar
+            </Button>
+            <Button variant="primary" type="submit" disabled={guardandoEdicion}>
+              {guardandoEdicion ? (
+                <>
+                  <Spinner animation="border" size="sm" className="me-1" />
+                  Guardando...
+                </>
+              ) : (
+                'Guardar Cambios'
+              )}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
     </Container>
   );
 }
