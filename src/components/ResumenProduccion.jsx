@@ -5,7 +5,9 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${API_BASE}/api`;
 
 export function ResumenProduccion() {
-  const fechaHoy = new Date().toISOString().split('T')[0];
+
+const hoy = new Date();
+const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
   const [fecha, setFecha] = useState(fechaHoy);
   const [resumen, setResumen] = useState([]);
   const [cargando, setCargando] = useState(true);
