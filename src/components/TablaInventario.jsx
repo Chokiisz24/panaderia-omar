@@ -9,10 +9,13 @@ export function TablaInventario() {
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   
-  // Estado para modal de actualización de stock móvil
-  const [showModal, setShowModal] = useState(false);
+  // Modales
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  
   const [selectedItem, setSelectedItem] = useState(null);
   const [cantidadSumar, setCantidadSumar] = useState('');
+  const [nuevoStockExacto, setNuevoStockExacto] = useState('');
 
   const cargarInventario = async () => {
     try {
@@ -44,17 +47,32 @@ export function TablaInventario() {
     }
   };
 
-  const handleOpenModal = (item) => {
+  // Handlers para modal de AGREGAR (Sumar)
+  const handleOpenAddModal = (item) => {
     setSelectedItem(item);
     setCantidadSumar('');
-    setShowModal(true);
+    setShowAddModal(true);
   };
 
   const handleConfirmAdd = () => {
     if (selectedItem && cantidadSumar) {
       const nuevoTotal = parseFloat(selectedItem.stock_actual) + parseFloat(cantidadSumar);
       actualizarStock(selectedItem.id, nuevoTotal);
-      setShowModal(false);
+      setShowAddModal(false);
+    }
+  };
+
+  // Handlers para modal de EDITAR (Sobreescribir)
+  const handleOpenEditModal = (item) => {
+    setSelectedItem(item);
+    setNuevoStockExacto(item.stock_actual.toString());
+    setShowEditModal(true);
+  };
+
+  const handleConfirmEdit = () => {
+    if (selectedItem && nuevoStockExacto !== '') {
+      actualizarStock(selectedItem.id, parseFloat(nuevoStockExacto));
+      setShowEditModal(false);
     }
   };
 
@@ -102,7 +120,7 @@ export function TablaInventario() {
                       )}
                     </div>
 
-                    <div className="d-flex justify-content-between align-items-center bg-light p-2 rounded mb-2">
+                    <div className="d-flex justify-content-between align-items-center bg-light p-2 rounded mb-3">
                       <div>
                         <small className="text-muted d-block">Stock Actual</small>
                         <span className="fw-bold fs-5 text-dark">
@@ -117,14 +135,25 @@ export function TablaInventario() {
                       </div>
                     </div>
 
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      className="w-100 py-2 fw-bold"
-                      onClick={() => handleOpenModal(item)}
-                    >
-                      + Agregar Stock
-                    </Button>
+                    {/* Botones de acción */}
+                    <div className="d-flex gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="w-50 py-2 fw-bold"
+                        onClick={() => handleOpenAddModal(item)}
+                      >
+                        + Sumar
+                      </Button>
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        className="w-50 py-2 fw-bold"
+                        onClick={() => handleOpenEditModal(item)}
+                      >
+                        ✏️ Editar
+                      </Button>
+                    </div>
                   </Card.Body>
                 </Card>
               </Col>
@@ -133,10 +162,10 @@ export function TablaInventario() {
         </Row>
       )}
 
-      {/* Modal táctil para ingresar nuevo stock en cel */}
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered size="sm">
+      {/* Modal para AGREGAR stock */}
+      <Modal show={showAddModal} onHide={() => setShowAddModal(false)} centered size="sm">
         <Modal.Header closeButton>
-          <Modal.Title className="fs-6">Agregar Stock</Modal.Title>
+          <Modal.Title className="fs-6">Sumar al Stock</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {selectedItem && (
@@ -144,7 +173,7 @@ export function TablaInventario() {
               <p className="mb-2 fw-bold">{selectedItem.nombre}</p>
               <Form.Group>
                 <Form.Label className="small text-muted">
-                  Cantidad a añadir ({selectedItem.unidad_medida}):
+                  Cantidad a sumar ({selectedItem.unidad_medida}):
                 </Form.Label>
                 <Form.Control
                   type="number"
@@ -159,11 +188,45 @@ export function TablaInventario() {
           )}
         </Modal.Body>
         <Modal.Footer className="p-2">
-          <Button variant="secondary" size="sm" onClick={() => setShowModal(false)}>
+          <Button variant="secondary" size="sm" onClick={() => setShowAddModal(false)}>
             Cancelar
           </Button>
           <Button variant="primary" size="sm" onClick={handleConfirmAdd}>
             Guardar
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal para EDITAR stock exacto */}
+      <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered size="sm">
+        <Modal.Header closeButton>
+          <Modal.Title className="fs-6">Editar Stock Actual</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedItem && (
+            <div>
+              <p className="mb-2 fw-bold">{selectedItem.nombre}</p>
+              <Form.Group>
+                <Form.Label className="small text-muted">
+                  Nuevo valor total ({selectedItem.unidad_medida}):
+                </Form.Label>
+                <Form.Control
+                  type="number"
+                  step="any"
+                  autoFocus
+                  value={nuevoStockExacto}
+                  onChange={(e) => setNuevoStockExacto(e.target.value)}
+                />
+              </Form.Group>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="p-2">
+          <Button variant="secondary" size="sm" onClick={() => setShowEditModal(false)}>
+            Cancelar
+          </Button>
+          <Button variant="warning" size="sm" className="fw-bold" onClick={handleConfirmEdit}>
+            Actualizar
           </Button>
         </Modal.Footer>
       </Modal>
