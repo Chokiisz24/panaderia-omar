@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Button, Card, Alert, Container, Row, Col, ListGroup, Badge } from 'react-bootstrap';
+import { Form, Button, Card, Alert, Container, Row, Col, ListGroup, Badge, Modal, Spinner } from 'react-bootstrap';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${API_BASE}/api`;
 
-// 💡 Valores por defecto forzados por si la base de datos aún tiene '1' guardado
 const LOTES_POR_DEFECTO = {
   'Masa Baguette': 15,
   'Brioche': 5.5,
@@ -20,6 +19,11 @@ export function RegistroProduccion() {
   const [recetaObjeto, setRecetaObjeto] = useState(null);
   const [cantidad, setCantidad] = useState(1);
   const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
+  
+  // 💡 Nuevos estados para feedback visual inmediato
+  const [procesando, setProcesando] = useState(false);
+  const [mostrarModalExito, setMostrarModalExito] = useState(false);
+  const [datosUltimoRegistro, setDatosUltimoRegistro] = useState(null);
 
   const cargarDatos = async () => {
     try {
@@ -51,7 +55,6 @@ export function RegistroProduccion() {
     setRecetaObjeto(seleccion || null);
 
     if (seleccion) {
-      // 💡 Prioriza el diccionario manual de lotes si existe, si no usa el de la BD o 1
       const loteDefecto = LOTES_POR_DEFECTO[seleccion.nombre] || seleccion.total_recetas || 1;
       setCantidad(parseFloat(loteDefecto));
     } else {
@@ -63,10 +66,13 @@ export function RegistroProduccion() {
     e.preventDefault();
     if (!recetaObjeto) return;
 
+    setProcesando(true);
+    setMensaje({ tipo: '', texto: '' });
+
     try {
       const baseTotalRecetas = parseFloat(LOTES_POR_DEFECTO[recetaObjeto.nombre] || recetaObjeto.total_recetas || 1);
 
-      // 1. Recorrer los ingredientes de la receta y descontar stock prorrateado
+      // 1. Recorrer los ingredientes de la receta y descontar stock
       for (const item of recetaObjeto.ingredientes) {
         const ingActual = ingredientes.find((i) => i.id === item.ingrediente_id);
         if (ingActual) {
@@ -82,7 +88,7 @@ export function RegistroProduccion() {
         }
       }
 
-      // 2. REGISTRAR EN LA TABLA PRODUCCION_LOG
+      // 2. Registrar en la tabla produccion_log
       const hoy = new Date();
       const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
 
@@ -96,14 +102,30 @@ export function RegistroProduccion() {
         })
       });
 
-      setMensaje({ tipo: 'success', texto: '¡Producción registrada, stock descontado y meta actualizada!' });
+      // Guardar datos del registro exitoso para la ventana emergente
+      setDatosUltimoRegistro({
+        nombre: recetaObjeto.nombre,
+        cantidad: cantidad
+      });
+
+      setMensaje({
+        tipo: 'success',
+        texto: `¡Producción de ${cantidad} x ${recetaObjeto.nombre} registrada correctamente!`
+      });
+
+      // Mostrar modal emergente
+      setMostrarModalExito(true);
+
+      // Limpieza de formulario
       setCantidad(1);
       setRecetaSeleccionada('');
       setRecetaObjeto(null);
-      cargarDatos();
+      await cargarDatos();
     } catch (err) {
       console.error('Error al procesar la producción:', err);
-      setMensaje({ tipo: 'danger', texto: 'Error al procesar la producción.' });
+      setMensaje({ tipo: 'danger', texto: 'Error al procesar la producción. Inténtalo de nuevo.' });
+    } finally {
+      setProcesando(false);
     }
   };
 
@@ -113,23 +135,33 @@ export function RegistroProduccion() {
   };
 
   return (
-    <Container>
+    <Container className="py-2">
       <Row className="justify-content-center">
         <Col xs={12} md={7}>
-          <Card className="shadow-sm">
-            <Card.Header className="bg-primary text-white text-center">
-              <h5 className="mb-0">Registrar Producción Diaria</h5>
+          <Card className="shadow-sm border-0">
+            <Card.Header className="bg-primary text-white text-center py-3">
+              <h5 className="mb-0 fw-bold">Registrar Producción Diaria</h5>
             </Card.Header>
-            <Card.Body>
-              {mensaje.texto && <Alert variant={mensaje.tipo}>{mensaje.texto}</Alert>}
+            <Card.Body className="p-4">
+              {mensaje.texto && (
+                <Alert
+                  variant={mensaje.tipo}
+                  dismissible
+                  onClose={() => setMensaje({ tipo: '', texto: '' })}
+                  className="mb-3"
+                >
+                  {mensaje.texto}
+                </Alert>
+              )}
 
               <Form onSubmit={handleProcesarProduccion}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Seleccionar Receta</Form.Label>
+                  <Form.Label className="fw-bold">Seleccionar Receta</Form.Label>
                   <Form.Select 
                     value={recetaSeleccionada} 
                     onChange={(e) => handleCambioReceta(e.target.value)}
                     required
+                    disabled={procesando}
                   >
                     <option value="">-- Selecciona una receta --</option>
                     {recetas.map((r) => (
@@ -139,7 +171,7 @@ export function RegistroProduccion() {
                 </Form.Group>
 
                 <Form.Group className="mb-3">
-                  <Form.Label>Número de Recetas / Batches a producir</Form.Label>
+                  <Form.Label className="fw-bold">Número de Recetas a producir</Form.Label>
                   <Form.Control 
                     type="number" 
                     min="0.1" 
@@ -147,14 +179,15 @@ export function RegistroProduccion() {
                     value={cantidad} 
                     onChange={(e) => setCantidad(e.target.value)}
                     required
+                    disabled={procesando}
                   />
                 </Form.Group>
 
                 {recetaObjeto && (
                   <Card className="mb-3 bg-light border-info">
                     <Card.Body className="p-3">
-                      <h6 className="text-info-emphasis mb-2">
-                        📋 Ingredientes necesarios para {cantidad} receta(s):
+                      <h6 className="text-info-emphasis mb-2 fw-bold">
+                        📋 Ingredientes que se descontarán ({cantidad} receta/s):
                       </h6>
                       <ListGroup variant="flush">
                         {recetaObjeto.ingredientes.map((item) => {
@@ -167,7 +200,7 @@ export function RegistroProduccion() {
                           return (
                             <ListGroup.Item 
                               key={item.ingrediente_id} 
-                              className="d-flex justify-content-between align-items-center bg-transparent py-1 px-0"
+                              className="d-flex justify-content-between align-items-center bg-transparent py-1 px-0 border-0"
                             >
                               <span>{detalle.nombre}</span>
                               <Badge bg="secondary">
@@ -181,14 +214,49 @@ export function RegistroProduccion() {
                   </Card>
                 )}
 
-                <Button variant="success" type="submit" className="w-100 btn-lg" disabled={!recetaObjeto}>
-                  Descontar del Inventario
+                <Button 
+                  variant="success" 
+                  type="submit" 
+                  className="w-100 btn-lg fw-bold d-flex align-items-center justify-content-center gap-2" 
+                  disabled={!recetaObjeto || procesando}
+                >
+                  {procesando ? (
+                    <>
+                      <Spinner animation="border" size="sm" />
+                      Descontando del inventario...
+                    </>
+                  ) : (
+                    'Descontar del Inventario'
+                  )}
                 </Button>
               </Form>
             </Card.Body>
           </Card>
         </Col>
       </Row>
+
+      {/* 🟢 MODAL EMERGENTE DE CONFIRMACIÓN */}
+      <Modal 
+        show={mostrarModalExito} 
+        onHide={() => setMostrarModalExito(false)} 
+        centered
+      >
+        <Modal.Header closeButton className="bg-success text-white">
+          <Modal.Title className="h5 mb-0">¡Producción Registrada!</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center py-4">
+          <div className="fs-1 text-success mb-2">✅</div>
+          <h5 className="fw-bold">{datosUltimoRegistro?.nombre}</h5>
+          <p className="mb-0 text-muted">
+            Se registraron <strong>{datosUltimoRegistro?.cantidad}</strong> receta(s) y los insumos correspondientes han sido descontados correctamente del inventario.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="success" className="w-100 fw-bold" onClick={() => setMostrarModalExito(false)}>
+            Aceptar
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 }
