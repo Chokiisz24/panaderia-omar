@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Container, Form, Row, Col, ProgressBar, Badge, Button, Alert } from 'react-bootstrap';
+import { Card, Container, Form, Row, Col, Badge, Button, Alert } from 'react-bootstrap';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${API_BASE}/api`;
@@ -9,7 +9,6 @@ export function ResumenProduccion() {
   const hoy = new Date();
   const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
 
-  // Declaración de estados (incluyendo 'error' y 'setError')
   const [fecha, setFecha] = useState(fechaHoy);
   const [resumen, setResumen] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -29,6 +28,7 @@ export function ResumenProduccion() {
       const data = await res.json();
 
       if (Array.isArray(data)) {
+        // Filtramos para mostrar únicamente lo que se haya producido en el día
         setResumen(data);
       } else {
         console.error('La API no devolvió un array:', data);
@@ -80,47 +80,32 @@ export function ResumenProduccion() {
         <div className="text-center p-4 text-muted">Cargando producción del día...</div>
       ) : (
         <Row className="g-2">
-          {resumen.length === 0 && !error && (
+          {resumen.filter((item) => parseFloat(item.total_producido || 0) > 0).length === 0 && !error && (
             <Col xs={12}>
               <div className="text-center p-3 text-muted">
-                No hay metas ni producción registradas para esta fecha.
+                No hay producción registrada para esta fecha.
               </div>
             </Col>
           )}
 
-          {resumen.map((item) => {
-            const producido = parseFloat(item.total_producido || 0);
-            const meta = parseFloat(item.meta_diaria || 0);
-            const porcentaje = meta > 0 ? Math.min((producido / meta) * 100, 100) : 0;
-            const completado = producido >= meta && meta > 0;
+          {resumen
+            .filter((item) => parseFloat(item.total_producido || 0) > 0)
+            .map((item) => {
+              const producido = parseFloat(item.total_producido || 0);
 
-            return (
-              <Col xs={12} key={item.receta_id || item.nombre}>
-                <Card className={`shadow-sm border-0 border-start border-4 ${completado ? 'border-success' : 'border-warning'}`}>
-                  <Card.Body className="p-3">
-                    <div className="d-flex justify-content-between align-items-center mb-1">
+              return (
+                <Col xs={12} key={item.receta_id || item.nombre}>
+                  <Card className="shadow-sm border-0 border-start border-4 border-primary">
+                    <Card.Body className="p-3 d-flex justify-content-between align-items-center">
                       <h6 className="fw-bold mb-0">{item.nombre}</h6>
-                      <Badge bg={completado ? 'success' : 'secondary'}>
-                        {producido} / {meta} tandas
+                      <Badge bg="primary" className="fs-6 px-3 py-2">
+                        {producido}
                       </Badge>
-                    </div>
-
-                    <small className="text-muted d-block mb-2">
-                      {meta > 0 
-                        ? `Meta según hoja: ${meta} lote(s)`
-                        : 'Sin meta definida'}
-                    </small>
-
-                    <ProgressBar
-                      now={porcentaje}
-                      variant={completado ? 'success' : 'warning'}
-                      style={{ height: '8px' }}
-                    />
-                  </Card.Body>
-                </Card>
-              </Col>
-            );
-          })}
+                    </Card.Body>
+                  </Card>
+                </Col>
+              );
+            })}
         </Row>
       )}
     </Container>
