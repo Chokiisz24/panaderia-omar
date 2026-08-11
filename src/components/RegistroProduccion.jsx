@@ -20,7 +20,6 @@ export function RegistroProduccion() {
   const [cantidad, setCantidad] = useState(1);
   const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
   
-  // 💡 Nuevos estados para feedback visual inmediato
   const [procesando, setProcesando] = useState(false);
   const [mostrarModalExito, setMostrarModalExito] = useState(false);
   const [datosUltimoRegistro, setDatosUltimoRegistro] = useState(null);
@@ -72,7 +71,7 @@ export function RegistroProduccion() {
     try {
       const baseTotalRecetas = parseFloat(LOTES_POR_DEFECTO[recetaObjeto.nombre] || recetaObjeto.total_recetas || 1);
 
-      // 1. Recorrer los ingredientes de la receta y descontar stock
+      // 1. Recorrer ingredientes y descontar stock
       for (const item of recetaObjeto.ingredientes) {
         const ingActual = ingredientes.find((i) => i.id === item.ingrediente_id);
         if (ingActual) {
@@ -88,7 +87,7 @@ export function RegistroProduccion() {
         }
       }
 
-      // 2. Registrar en la tabla produccion_log
+      // 2. Registrar produccion_log
       const hoy = new Date();
       const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
 
@@ -102,7 +101,6 @@ export function RegistroProduccion() {
         })
       });
 
-      // Guardar datos del registro exitoso para la ventana emergente
       setDatosUltimoRegistro({
         nombre: recetaObjeto.nombre,
         cantidad: cantidad
@@ -113,10 +111,8 @@ export function RegistroProduccion() {
         texto: `¡Producción de ${cantidad} x ${recetaObjeto.nombre} registrada correctamente!`
       });
 
-      // Mostrar modal emergente
       setMostrarModalExito(true);
 
-      // Limpieza de formulario
       setCantidad(1);
       setRecetaSeleccionada('');
       setRecetaObjeto(null);
@@ -132,6 +128,18 @@ export function RegistroProduccion() {
   const getDetalleIngrediente = (id) => {
     const ing = ingredientes.find((i) => i.id === id);
     return ing ? { nombre: ing.nombre, unidad: ing.unidad_medida } : { nombre: 'Desconocido', unidad: '' };
+  };
+
+  // ⚖️ Cálculo dinámico del TOTAL MASA para la cantidad seleccionada
+  const calcularTotalMasa = () => {
+    if (!recetaObjeto || !recetaObjeto.ingredientes) return 0;
+    const baseTotalRecetas = parseFloat(LOTES_POR_DEFECTO[recetaObjeto.nombre] || recetaObjeto.total_recetas || 1);
+
+    return recetaObjeto.ingredientes.reduce((sum, item) => {
+      const cantidadUnitaria = parseFloat(item.cantidad_requerida) / baseTotalRecetas;
+      const totalRequerido = cantidadUnitaria * parseFloat(cantidad || 0);
+      return sum + (isNaN(totalRequerido) ? 0 : totalRequerido);
+    }, 0);
   };
 
   return (
@@ -209,6 +217,14 @@ export function RegistroProduccion() {
                             </ListGroup.Item>
                           );
                         })}
+
+                        {/* ⚖️ RESUMEN DE TOTAL MASA */}
+                        <ListGroup.Item className="d-flex justify-content-between align-items-center bg-white mt-2 p-2 rounded border fw-bold text-dark">
+                          <span>TOTAL MASA:</span>
+                          <Badge bg="dark" className="fs-6">
+                            {calcularTotalMasa().toLocaleString('es-MX', { maximumFractionDigits: 2 })} g / ml
+                          </Badge>
+                        </ListGroup.Item>
                       </ListGroup>
                     </Card.Body>
                   </Card>
