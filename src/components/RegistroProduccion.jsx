@@ -49,33 +49,49 @@ export function RegistroProduccion() {
   }
 };
 
-  const handleProcesarProduccion = async (e) => {
-    e.preventDefault();
-    if (!recetaObjeto) return;
+const handleProcesarProduccion = async (e) => {
+  e.preventDefault();
+  if (!recetaObjeto) return;
 
-    try {
-      // Recorrer los ingredientes de la receta y actualizar cada uno en la base de datos
-      for (const item of recetaObjeto.ingredientes) {
-        const ingActual = ingredientes.find((i) => i.id === item.ingrediente_id);
-        if (ingActual) {
-          const descuento = item.cantidad_requerida * parseFloat(cantidad);
-          const nuevoStock = parseFloat(ingActual.stock_actual) - descuento;
+  try {
+    // 1. Recorrer los ingredientes de la receta y descontar stock
+    for (const item of recetaObjeto.ingredientes) {
+      const ingActual = ingredientes.find((i) => i.id === item.ingrediente_id);
+      if (ingActual) {
+        const descuento = item.cantidad_requerida * parseFloat(cantidad);
+        const nuevoStock = parseFloat(ingActual.stock_actual) - descuento;
 
-          await fetch(`${API_URL}/ingredientes/${ingActual.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ stock_actual: nuevoStock })
-          });
-        }
+        await fetch(`${API_URL}/ingredientes/${ingActual.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stock_actual: nuevoStock })
+        });
       }
-
-      setMensaje({ tipo: 'success', texto: '¡Producción registrada y stock descontado en Render!' });
-      setCantidad(1);
-      cargarDatos();
-    } catch (err) {
-      setMensaje({ tipo: 'danger', texto: 'Error al procesar la producción.' });
     }
-  };
+
+    // 2. 💡 REGISTRAR EN LA TABLA PRODUCCION_LOG
+    // Obtener la fecha local en formato YYYY-MM-DD
+    const hoy = new Date();
+    const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+
+    await fetch(`${API_URL}/produccion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        receta_id: recetaObjeto.id,
+        cantidad_producida: parseFloat(cantidad),
+        fecha: fechaHoy
+      })
+    });
+
+    setMensaje({ tipo: 'success', texto: '¡Producción registrada, stock descontado y meta actualizada!' });
+    setCantidad(1);
+    cargarDatos();
+  } catch (err) {
+    console.error('Error al procesar la producción:', err);
+    setMensaje({ tipo: 'danger', texto: 'Error al procesar la producción.' });
+  }
+};
 
   const getDetalleIngrediente = (id) => {
     const ing = ingredientes.find((i) => i.id === id);
