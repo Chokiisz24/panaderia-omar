@@ -3,6 +3,7 @@ import { Container, Nav, Navbar, Card } from 'react-bootstrap';
 import { RegistroProduccion } from './components/RegistroProduccion';
 import { TablaInventario } from './components/TablaInventario';
 import { RegistroMermas } from './components/RegistroMermas';
+import { ResumenProduccion } from './components/ResumenProduccion';
 
 export default function App() {
   const [tabActiva, setTabActiva] = useState('produccion');
@@ -23,6 +24,7 @@ export default function App() {
             {tabActiva === 'produccion' && <RegistroProduccion />}
             {tabActiva === 'inventario' && <TablaInventario />}
             {tabActiva === 'mermas' && <RegistroMermas />}
+            {tabActiva === 'resumen' && <ResumenProduccion />}
           </Card.Body>
         </Card>
       </Container>
@@ -42,6 +44,16 @@ export default function App() {
           >
             <div style={{ fontSize: '1.2rem' }}>👨‍🍳</div>
             <span style={{ fontSize: '0.75rem' }}>Producción</span>
+          </Nav.Link>
+
+          <Nav.Link
+            onClick={() => setTabActiva('resumen')}
+            className={`flex-fill py-1 ${
+              tabActiva === 'resumen' ? 'text-primary fw-bold' : 'text-muted'
+            }`}
+          >
+            <div style={{ fontSize: '1.2rem' }}>📊</div>
+            <span style={{ fontSize: '0.75rem' }}>Día / Metas</span>
           </Nav.Link>
 
           <Nav.Link
