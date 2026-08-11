@@ -31,67 +31,74 @@ export function RegistroProduccion() {
     cargarDatos();
   }, []);
 
- const handleCambioReceta = (id) => {
-  setRecetaSeleccionada(id);
-  if (!id) {
-    setRecetaObjeto(null);
-    setCantidad(1);
-    return;
-  }
-  const seleccion = recetas.find((r) => r.id === parseInt(id));
-  setRecetaObjeto(seleccion || null);
-
-  // Asigna el total por defecto de la receta seleccionada
-  if (seleccion && seleccion.total_recetas) {
-    setCantidad(parseFloat(seleccion.total_recetas));
-  } else {
-    setCantidad(1);
-  }
-};
-
-const handleProcesarProduccion = async (e) => {
-  e.preventDefault();
-  if (!recetaObjeto) return;
-
-  try {
-    // 1. Recorrer los ingredientes de la receta y descontar stock
-    for (const item of recetaObjeto.ingredientes) {
-      const ingActual = ingredientes.find((i) => i.id === item.ingrediente_id);
-      if (ingActual) {
-        const descuento = item.cantidad_requerida * parseFloat(cantidad);
-        const nuevoStock = parseFloat(ingActual.stock_actual) - descuento;
-
-        await fetch(`${API_URL}/ingredientes/${ingActual.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ stock_actual: nuevoStock })
-        });
-      }
+  const handleCambioReceta = (id) => {
+    setRecetaSeleccionada(id);
+    if (!id) {
+      setRecetaObjeto(null);
+      setCantidad(1);
+      return;
     }
+    const seleccion = recetas.find((r) => r.id === parseInt(id));
+    setRecetaObjeto(seleccion || null);
 
-    // 2. 💡 REGISTRAR EN LA TABLA PRODUCCION_LOG
-    // Obtener la fecha local en formato YYYY-MM-DD
-    const hoy = new Date();
-    const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+    // Asigna por defecto el lote total de la receta seleccionada (ej. 15 para Baguette, 10 para Pizza)
+    if (seleccion && seleccion.total_recetas) {
+      setCantidad(parseFloat(seleccion.total_recetas));
+    } else {
+      setCantidad(1);
+    }
+  };
 
-    await fetch(`${API_URL}/produccion`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        receta_id: recetaObjeto.id,
-        cantidad_producida: parseFloat(cantidad),
-        fecha: fechaHoy
-      })
-    });
+  const handleProcesarProduccion = async (e) => {
+    e.preventDefault();
+    if (!recetaObjeto) return;
 
-    setMensaje({ tipo: 'success', texto: '¡Producción registrada, stock descontado y meta actualizada!' });
-    setCantidad(1);
-    cargarDatos();
-  } catch (err) {
-    console.error('Error al procesar la producción:', err);
-    setMensaje({ tipo: 'danger', texto: 'Error al procesar la producción.' });
-  }
-};
+    try {
+      // Obtener el total_recetas base para calcular la cantidad unitaria
+      const baseTotalRecetas = parseFloat(recetaObjeto.total_recetas || 1);
+
+      // 1. Recorrer los ingredientes de la receta y descontar stock prorrateado
+      for (const item of recetaObjeto.ingredientes) {
+        const ingActual = ingredientes.find((i) => i.id === item.ingrediente_id);
+        if (ingActual) {
+          // Cantidad por 1 sola receta unitaria
+          const cantidadUnitaria = parseFloat(item.cantidad_requerida) / baseTotalRecetas;
+          // Descuento total basado en las recetas elegidas en el input
+          const descuento = cantidadUnitaria * parseFloat(cantidad || 0);
+          const nuevoStock = parseFloat(ingActual.stock_actual) - descuento;
+
+          await fetch(`${API_URL}/ingredientes/${ingActual.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stock_actual: nuevoStock })
+          });
+        }
+      }
+
+      // 2. REGISTRAR EN LA TABLA PRODUCCION_LOG
+      const hoy = new Date();
+      const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+
+      await fetch(`${API_URL}/produccion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receta_id: recetaObjeto.id,
+          cantidad_producida: parseFloat(cantidad),
+          fecha: fechaHoy
+        })
+      });
+
+      setMensaje({ tipo: 'success', texto: '¡Producción registrada, stock descontado y meta actualizada!' });
+      setCantidad(1);
+      setRecetaSeleccionada('');
+      setRecetaObjeto(null);
+      cargarDatos();
+    } catch (err) {
+      console.error('Error al procesar la producción:', err);
+      setMensaje({ tipo: 'danger', texto: 'Error al procesar la producción.' });
+    }
+  };
 
   const getDetalleIngrediente = (id) => {
     const ing = ingredientes.find((i) => i.id === id);
@@ -108,7 +115,7 @@ const handleProcesarProduccion = async (e) => {
             </Card.Header>
             <Card.Body>
               {mensaje.texto && <Alert variant={mensaje.tipo}>{mensaje.texto}</Alert>}
-              
+
               <Form onSubmit={handleProcesarProduccion}>
                 <Form.Group className="mb-3">
                   <Form.Label>Seleccionar Receta</Form.Label>
@@ -145,7 +152,11 @@ const handleProcesarProduccion = async (e) => {
                       <ListGroup variant="flush">
                         {recetaObjeto.ingredientes.map((item) => {
                           const detalle = getDetalleIngrediente(item.ingrediente_id);
-                          const totalRequerido = item.cantidad_requerida * parseFloat(cantidad || 0);
+                          const baseTotalRecetas = parseFloat(recetaObjeto.total_recetas || 1);
+                          
+                          // Cálculo unitario exacto por receta individual
+                          const cantidadUnitaria = parseFloat(item.cantidad_requerida) / baseTotalRecetas;
+                          const totalRequerido = cantidadUnitaria * parseFloat(cantidad || 0);
 
                           return (
                             <ListGroup.Item 
@@ -154,7 +165,7 @@ const handleProcesarProduccion = async (e) => {
                             >
                               <span>{detalle.nombre}</span>
                               <Badge bg="secondary">
-                                {totalRequerido.toLocaleString()} {detalle.unidad}
+                                {totalRequerido.toLocaleString('es-MX', { maximumFractionDigits: 2 })} {detalle.unidad}
                               </Badge>
                             </ListGroup.Item>
                           );
