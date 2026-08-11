@@ -1,41 +1,50 @@
-import React, { useEffect, useState } from 'react';
-import { Table, Badge, Button, Container, Card } from 'react-bootstrap';
+import React, { useState } from 'react';
+import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${API_BASE}/api`;
 
-export function TablaInventario() {
-  const [ingredientes, setIngredientes] = useState([]);
+export function RegistroMermas() {
+  const [tipoItem, setTipoItem] = useState('producto_terminado');
+  const [nombreItem, setNombreItem] = useState('');
+  const [cantidad, setCantidad] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [exito, setExito] = useState(false);
+  const [error, setError] = useState('');
 
-  const cargarInventario = async () => {
+  const handleGuardarMerma = async (e) => {
+    e.preventDefault();
+    setExito(false);
+    setError('');
+
     try {
-      const res = await fetch(`${API_URL}/ingredientes`);
-      const data = await res.json();
-      setIngredientes(data);
-    } catch (err) {
-      console.error('Error cargando inventario:', err);
-    }
-  };
-
-  useEffect(() => {
-    cargarInventario();
-  }, []);
-
-  const actualizarStock = async (id, nuevoStock) => {
-    try {
-      await fetch(`${API_URL}/ingredientes/${id}`, {
-        method: 'PUT',
+      const res = await fetch(`${API_URL}/mermas`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stock_actual: nuevoStock })
+        body: JSON.stringify({
+          tipo_item: tipoItem,
+          nombre_item: nombreItem,
+          cantidad: parseFloat(cantidad),
+          motivo: motivo
+        })
       });
-      cargarInventario();
+
+      if (res.ok) {
+        setExito(true);
+        setNombreItem('');
+        setCantidad('');
+        setMotivo('');
+      } else {
+        setError('Error al registrar la merma');
+      }
     } catch (err) {
-      console.error('Error actualizando stock:', err);
+      console.error('Error enviando merma:', err);
+      setError('Error de conexión con el servidor');
     }
   };
 
   return (
-    <Container>
+    <Container className="mt-4">
       <Row className="justify-content-center">
         <Col xs={12} md={6}>
           <Card className="shadow-sm">
@@ -44,6 +53,8 @@ export function TablaInventario() {
             </Card.Header>
             <Card.Body>
               {exito && <Alert variant="success">Merma registrada correctamente.</Alert>}
+              {error && <Alert variant="danger">{error}</Alert>}
+
               <Form onSubmit={handleGuardarMerma}>
                 <Form.Group className="mb-3">
                   <Form.Label>Tipo de Merma</Form.Label>
