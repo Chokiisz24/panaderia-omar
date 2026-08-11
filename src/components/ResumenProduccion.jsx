@@ -1,45 +1,48 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Container, Form, Row, Col, ProgressBar, Badge, Button } from 'react-bootstrap';
+import { Card, Container, Form, Row, Col, ProgressBar, Badge, Button, Alert } from 'react-bootstrap';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${API_BASE}/api`;
 
 export function ResumenProduccion() {
+  // Fecha local exacta (YYYY-MM-DD)
+  const hoy = new Date();
+  const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
 
-const hoy = new Date();
-const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+  // Declaración de estados (incluyendo 'error' y 'setError')
   const [fecha, setFecha] = useState(fechaHoy);
   const [resumen, setResumen] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
 
-const cargarResumen = async () => {
-  try {
-    setCargando(true);
-    setError(null);
+  const cargarResumen = async () => {
+    try {
+      setCargando(true);
+      setError(null);
 
-    const res = await fetch(`${API_URL}/produccion/resumen?fecha=${fecha}`);
-    const data = await res.json();
+      const res = await fetch(`${API_URL}/produccion/resumen?fecha=${fecha}`);
 
-    // Si la respuesta del servidor no fue exitosa (ej. 500, 404)
-    if (!res.ok) {
-      throw new Error(data.error || `Error del servidor (${res.status})`);
-    }
+      if (!res.ok) {
+        throw new Error(`Error en el servidor (${res.status})`);
+      }
 
-    // Asegurarse de que data sea realmente un Array
-    if (Array.isArray(data)) {
-      setResumen(data);
-    } else {
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
+        setResumen(data);
+      } else {
+        console.error('La API no devolvió un array:', data);
+        setResumen([]);
+        setError('El formato de datos recibido no es válido.');
+      }
+    } catch (err) {
+      console.error('Error cargando resumen de producción:', err);
+      setError(err.message || 'No se pudo conectar con el servidor.');
       setResumen([]);
-      setError('Formato de datos no válido.');
+    } finally {
+      setCargando(false);
     }
-  } catch (err) {
-    console.error('Error cargando resumen de producción:', err);
-    setError(err.message || 'Error al conectar con la base de datos.');
-    setResumen([]); // Asigna array vacío para prevenir el fallo de .map()
-  } finally {
-    setCargando(false);
-  }
-};
+  };
 
   useEffect(() => {
     cargarResumen();
@@ -65,19 +68,34 @@ const cargarResumen = async () => {
         </Card.Body>
       </Card>
 
-      {/* Lista de producción */}
+      {/* Alerta de error si falla la petición */}
+      {error && (
+        <Alert variant="danger" className="py-2 text-center small mb-3">
+          {error}
+        </Alert>
+      )}
+
+      {/* Estado de carga / Lista de producción */}
       {cargando ? (
-        <div className="text-center p-4">Cargando producción del día...</div>
+        <div className="text-center p-4 text-muted">Cargando producción del día...</div>
       ) : (
         <Row className="g-2">
+          {resumen.length === 0 && !error && (
+            <Col xs={12}>
+              <div className="text-center p-3 text-muted">
+                No hay metas ni producción registradas para esta fecha.
+              </div>
+            </Col>
+          )}
+
           {resumen.map((item) => {
-            const producido = parseFloat(item.total_producido);
-            const meta = parseFloat(item.meta_diaria);
+            const producido = parseFloat(item.total_producido || 0);
+            const meta = parseFloat(item.meta_diaria || 0);
             const porcentaje = meta > 0 ? Math.min((producido / meta) * 100, 100) : 0;
             const completado = producido >= meta && meta > 0;
 
             return (
-              <Col xs={12} key={item.receta_id}>
+              <Col xs={12} key={item.receta_id || item.nombre}>
                 <Card className={`shadow-sm border-0 border-start border-4 ${completado ? 'border-success' : 'border-warning'}`}>
                   <Card.Body className="p-3">
                     <div className="d-flex justify-content-between align-items-center mb-1">
