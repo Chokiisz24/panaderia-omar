@@ -1,21 +1,35 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Card, Alert, Container, Row, Col, ListGroup, Badge } from 'react-bootstrap';
-import { getRecetas, getIngredientes, saveIngredientes } from '../utils/storage';
+
+const API_URL = 'https://panaderia-backend-omar.onrender.com/api';
 
 export function RegistroProduccion() {
   const [recetas, setRecetas] = useState([]);
-  const [ingredientesBase, setIngredientesBase] = useState([]);
+  const [ingredientes, setIngredientes] = useState([]);
   const [recetaSeleccionada, setRecetaSeleccionada] = useState('');
   const [recetaObjeto, setRecetaObjeto] = useState(null);
   const [cantidad, setCantidad] = useState(1);
   const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
 
+  const cargarDatos = async () => {
+    try {
+      const [resRecetas, resIngredientes] = await Promise.all([
+        fetch(`${API_URL}/recetas`),
+        fetch(`${API_URL}/ingredientes`)
+      ]);
+      const dataRecetas = await resRecetas.json();
+      const dataIngredientes = await resIngredientes.json();
+      setRecetas(dataRecetas);
+      setIngredientes(dataIngredientes);
+    } catch (err) {
+      console.error('Error al cargar datos:', err);
+    }
+  };
+
   useEffect(() => {
-    setRecetas(getRecetas());
-    setIngredientesBase(getIngredientes());
+    cargarDatos();
   }, []);
 
-  // Al cambiar la receta en el dropdown, buscamos los detalles completos
   const handleCambioReceta = (id) => {
     setRecetaSeleccionada(id);
     if (!id) {
@@ -26,32 +40,36 @@ export function RegistroProduccion() {
     setRecetaObjeto(seleccion || null);
   };
 
-  const handleProcesarProduccion = (e) => {
+  const handleProcesarProduccion = async (e) => {
     e.preventDefault();
     if (!recetaObjeto) return;
 
-    let ingredientesActuales = getIngredientes();
+    try {
+      // Recorrer los ingredientes de la receta y actualizar cada uno en la base de datos
+      for (const item of recetaObjeto.ingredientes) {
+        const ingActual = ingredientes.find((i) => i.id === item.ingrediente_id);
+        if (ingActual) {
+          const descuento = item.cantidad_requerida * parseFloat(cantidad);
+          const nuevoStock = parseFloat(ingActual.stock_actual) - descuento;
 
-    // Descontar cada ingrediente multiplicando por el número de recetas/batches
-    recetaObjeto.ingredientes.forEach((item) => {
-      const descuento = item.cantidad_requerida * parseFloat(cantidad);
-      ingredientesActuales = ingredientesActuales.map((ing) => {
-        if (ing.id === item.ingrediente_id) {
-          return { ...ing, stock_actual: ing.stock_actual - descuento };
+          await fetch(`${API_URL}/ingredientes/${ingActual.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stock_actual: nuevoStock })
+          });
         }
-        return ing;
-      });
-    });
+      }
 
-    saveIngredientes(ingredientesActuales);
-    setIngredientesBase(ingredientesActuales); // Actualizar estado local
-    setMensaje({ tipo: 'success', texto: '¡Producción registrada y stock descontado con éxito!' });
-    setCantidad(1);
+      setMensaje({ tipo: 'success', texto: '¡Producción registrada y stock descontado en Render!' });
+      setCantidad(1);
+      cargarDatos();
+    } catch (err) {
+      setMensaje({ tipo: 'danger', texto: 'Error al procesar la producción.' });
+    }
   };
 
-  // Función auxiliar para obtener el nombre y unidad del ingrediente por su ID
   const getDetalleIngrediente = (id) => {
-    const ing = ingredientesBase.find((i) => i.id === id);
+    const ing = ingredientes.find((i) => i.id === id);
     return ing ? { nombre: ing.nombre, unidad: ing.unidad_medida } : { nombre: 'Desconocido', unidad: '' };
   };
 
@@ -93,7 +111,6 @@ export function RegistroProduccion() {
                   />
                 </Form.Group>
 
-                {/* Vista previa de ingredientes de la receta seleccionada */}
                 {recetaObjeto && (
                   <Card className="mb-3 bg-light border-info">
                     <Card.Body className="p-3">
