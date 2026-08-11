@@ -31,15 +31,23 @@ export function RegistroProduccion() {
     cargarDatos();
   }, []);
 
-  const handleCambioReceta = (id) => {
-    setRecetaSeleccionada(id);
-    if (!id) {
-      setRecetaObjeto(null);
-      return;
-    }
-    const seleccion = recetas.find((r) => r.id === parseInt(id));
-    setRecetaObjeto(seleccion || null);
-  };
+ const handleCambioReceta = (id) => {
+  setRecetaSeleccionada(id);
+  if (!id) {
+    setRecetaObjeto(null);
+    setCantidad(1);
+    return;
+  }
+  const seleccion = recetas.find((r) => r.id === parseInt(id));
+  setRecetaObjeto(seleccion || null);
+
+  // Asigna el total por defecto de la receta seleccionada
+  if (seleccion && seleccion.total_recetas) {
+    setCantidad(parseFloat(seleccion.total_recetas));
+  } else {
+    setCantidad(1);
+  }
+};
 
   const handleProcesarProduccion = async (e) => {
     e.preventDefault();
