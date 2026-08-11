@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Button, Card, Alert, Container, Row, Col, ListGroup, Badge } from 'react-bootstrap';
 
-const API_URL = 'https://panaderia-backend-omar.onrender.com/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = `${API_BASE}/api`;
 
 export function RegistroProduccion() {
   const [recetas, setRecetas] = useState([]);

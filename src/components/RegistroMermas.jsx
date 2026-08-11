@@ -1,28 +1,37 @@
-import React, { useState } from 'react';
-import { Form, Button, Card, Container, Row, Col, Alert } from 'react-bootstrap';
-import { saveMerma } from '../utils/storage';
+import React, { useEffect, useState } from 'react';
+import { Table, Badge, Button, Container, Card } from 'react-bootstrap';
 
-export function RegistroMermas() {
-  const [tipoItem, setTipoItem] = useState('producto_terminado');
-  const [nombreItem, setNombreItem] = useState('');
-  const [cantidad, setCantidad] = useState('');
-  const [motivo, setMotivo] = useState('');
-  const [exito, setExito] = useState(false);
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = `${API_BASE}/api`;
 
-  const handleGuardarMerma = (e) => {
-    e.preventDefault();
-    saveMerma({
-      tipo_item: tipoItem,
-      descripcion_item: nombreItem,
-      cantidad: parseFloat(cantidad),
-      motivo: motivo
-    });
+export function TablaInventario() {
+  const [ingredientes, setIngredientes] = useState([]);
 
-    setNombreItem('');
-    setCantidad('');
-    setMotivo('');
-    setExito(true);
-    setTimeout(() => setExito(false), 3000);
+  const cargarInventario = async () => {
+    try {
+      const res = await fetch(`${API_URL}/ingredientes`);
+      const data = await res.json();
+      setIngredientes(data);
+    } catch (err) {
+      console.error('Error cargando inventario:', err);
+    }
+  };
+
+  useEffect(() => {
+    cargarInventario();
+  }, []);
+
+  const actualizarStock = async (id, nuevoStock) => {
+    try {
+      await fetch(`${API_URL}/ingredientes/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stock_actual: nuevoStock })
+      });
+      cargarInventario();
+    } catch (err) {
+      console.error('Error actualizando stock:', err);
+    }
   };
 
   return (
