@@ -12,18 +12,34 @@ const fechaHoy = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, 
   const [resumen, setResumen] = useState([]);
   const [cargando, setCargando] = useState(true);
 
-  const cargarResumen = async () => {
-    try {
-      setCargando(true);
-      const res = await fetch(`${API_URL}/produccion/resumen?fecha=${fecha}`);
-      const data = await res.json();
-      setResumen(data);
-    } catch (err) {
-      console.error('Error cargando resumen de producción:', err);
-    } finally {
-      setCargando(false);
+const cargarResumen = async () => {
+  try {
+    setCargando(true);
+    setError(null);
+
+    const res = await fetch(`${API_URL}/produccion/resumen?fecha=${fecha}`);
+    const data = await res.json();
+
+    // Si la respuesta del servidor no fue exitosa (ej. 500, 404)
+    if (!res.ok) {
+      throw new Error(data.error || `Error del servidor (${res.status})`);
     }
-  };
+
+    // Asegurarse de que data sea realmente un Array
+    if (Array.isArray(data)) {
+      setResumen(data);
+    } else {
+      setResumen([]);
+      setError('Formato de datos no válido.');
+    }
+  } catch (err) {
+    console.error('Error cargando resumen de producción:', err);
+    setError(err.message || 'Error al conectar con la base de datos.');
+    setResumen([]); // Asigna array vacío para prevenir el fallo de .map()
+  } finally {
+    setCargando(false);
+  }
+};
 
   useEffect(() => {
     cargarResumen();
