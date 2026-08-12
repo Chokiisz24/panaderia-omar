@@ -12,10 +12,12 @@ export function TablaInventario() {
   // Modales
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showMinModal, setShowMinModal] = useState(false);
   
   const [selectedItem, setSelectedItem] = useState(null);
   const [cantidadSumar, setCantidadSumar] = useState('');
   const [nuevoStockExacto, setNuevoStockExacto] = useState('');
+  const [nuevoStockMinimo, setNuevoStockMinimo] = useState('');
 
   const cargarInventario = async () => {
     try {
@@ -34,20 +36,21 @@ export function TablaInventario() {
     cargarInventario();
   }, []);
 
-  const actualizarStock = async (id, nuevoStock) => {
+  // Función genérica para actualizar campos en la BD
+  const actualizarIngrediente = async (id, datos) => {
     try {
       await fetch(`${API_URL}/ingredientes/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stock_actual: nuevoStock })
+        body: JSON.stringify(datos)
       });
       cargarInventario();
     } catch (err) {
-      console.error('Error actualizando stock:', err);
+      console.error('Error actualizando ingrediente:', err);
     }
   };
 
-  // Handlers para modal de AGREGAR (Sumar)
+  // Handlers para modal de AGREGAR (Sumar a Stock Actual)
   const handleOpenAddModal = (item) => {
     setSelectedItem(item);
     setCantidadSumar('');
@@ -57,12 +60,12 @@ export function TablaInventario() {
   const handleConfirmAdd = () => {
     if (selectedItem && cantidadSumar) {
       const nuevoTotal = parseFloat(selectedItem.stock_actual) + parseFloat(cantidadSumar);
-      actualizarStock(selectedItem.id, nuevoTotal);
+      actualizarIngrediente(selectedItem.id, { stock_actual: nuevoTotal });
       setShowAddModal(false);
     }
   };
 
-  // Handlers para modal de EDITAR (Sobreescribir)
+  // Handlers para modal de EDITAR (Sobreescribir Stock Actual)
   const handleOpenEditModal = (item) => {
     setSelectedItem(item);
     setNuevoStockExacto(item.stock_actual.toString());
@@ -71,8 +74,22 @@ export function TablaInventario() {
 
   const handleConfirmEdit = () => {
     if (selectedItem && nuevoStockExacto !== '') {
-      actualizarStock(selectedItem.id, parseFloat(nuevoStockExacto));
+      actualizarIngrediente(selectedItem.id, { stock_actual: parseFloat(nuevoStockExacto) });
       setShowEditModal(false);
+    }
+  };
+
+  // Handlers para modal de EDITAR STOCK MÍNIMO
+  const handleOpenMinModal = (item) => {
+    setSelectedItem(item);
+    setNuevoStockMinimo(item.stock_minimo.toString());
+    setShowMinModal(true);
+  };
+
+  const handleConfirmMinEdit = () => {
+    if (selectedItem && nuevoStockMinimo !== '') {
+      actualizarIngrediente(selectedItem.id, { stock_minimo: parseFloat(nuevoStockMinimo) });
+      setShowMinModal(false);
     }
   };
 
@@ -140,7 +157,7 @@ export function TablaInventario() {
                       <Button
                         variant="primary"
                         size="sm"
-                        className="w-50 py-2 fw-bold"
+                        className="w-100 py-2 fw-bold"
                         onClick={() => handleOpenAddModal(item)}
                       >
                         + Sumar
@@ -148,10 +165,18 @@ export function TablaInventario() {
                       <Button
                         variant="outline-secondary"
                         size="sm"
-                        className="w-50 py-2 fw-bold"
+                        className="w-100 py-2 fw-bold"
                         onClick={() => handleOpenEditModal(item)}
                       >
-                        ✏️ Editar
+                        ✏️ Stock
+                      </Button>
+                      <Button
+                        variant="outline-warning"
+                        size="sm"
+                        className="w-100 py-2 fw-bold text-dark"
+                        onClick={() => handleOpenMinModal(item)}
+                      >
+                        ⚙️ Mínimo
                       </Button>
                     </div>
                   </Card.Body>
@@ -197,7 +222,7 @@ export function TablaInventario() {
         </Modal.Footer>
       </Modal>
 
-      {/* Modal para EDITAR stock exacto */}
+      {/* Modal para EDITAR stock actual */}
       <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered size="sm">
         <Modal.Header closeButton>
           <Modal.Title className="fs-6">Editar Stock Actual</Modal.Title>
@@ -226,6 +251,40 @@ export function TablaInventario() {
             Cancelar
           </Button>
           <Button variant="warning" size="sm" className="fw-bold" onClick={handleConfirmEdit}>
+            Actualizar
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal para EDITAR stock mínimo */}
+      <Modal show={showMinModal} onHide={() => setShowMinModal(false)} centered size="sm">
+        <Modal.Header closeButton>
+          <Modal.Title className="fs-6">Editar Stock Mínimo</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedItem && (
+            <div>
+              <p className="mb-2 fw-bold">{selectedItem.nombre}</p>
+              <Form.Group>
+                <Form.Label className="small text-muted">
+                  Nuevo límite mínimo ({selectedItem.unidad_medida}):
+                </Form.Label>
+                <Form.Control
+                  type="number"
+                  step="any"
+                  autoFocus
+                  value={nuevoStockMinimo}
+                  onChange={(e) => setNuevoStockMinimo(e.target.value)}
+                />
+              </Form.Group>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="p-2">
+          <Button variant="secondary" size="sm" onClick={() => setShowMinModal(false)}>
+            Cancelar
+          </Button>
+          <Button variant="warning" size="sm" className="fw-bold" onClick={handleConfirmMinEdit}>
             Actualizar
           </Button>
         </Modal.Footer>
