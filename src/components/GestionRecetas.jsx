@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Button, Card, Alert, Container, Row, Col, Table, InputGroup, Spinner } from 'react-bootstrap';
+import { Form, Button, Card, Alert, Container, Row, Col, Table, InputGroup, Spinner, Badge } from 'react-bootstrap';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${API_BASE}/api`;
 
 export function GestionRecetas() {
   const [ingredientesDisponibles, setIngredientesDisponibles] = useState([]);
+  const [recetasExistentes, setRecetasExistentes] = useState([]);
   const [nombreReceta, setNombreReceta] = useState('');
   const [ingredientesReceta, setIngredientesReceta] = useState([]);
 
-  // Estados para el campo de texto de ingredientes
   const [nombreIngredienteInput, setNombreIngredienteInput] = useState('');
   const [unidadMedidaInput, setUnidadMedidaInput] = useState('g');
   const [cantidadGramos, setCantidadGramos] = useState('');
@@ -17,22 +17,46 @@ export function GestionRecetas() {
   const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
   const [guardando, setGuardando] = useState(false);
 
-  // Cargar ingredientes existentes al montar el componente
-  const cargarIngredientes = async () => {
+  const cargarDatos = async () => {
     try {
-      const res = await fetch(`${API_URL}/ingredientes`);
-      const data = await res.json();
-      setIngredientesDisponibles(data);
+      const [resIng, resRec] = await Promise.all([
+        fetch(`${API_URL}/ingredientes`),
+        fetch(`${API_URL}/recetas`)
+      ]);
+      const dataIng = await resIng.json();
+      const dataRec = await resRec.json();
+      setIngredientesDisponibles(dataIng);
+      setRecetasExistentes(dataRec);
     } catch (err) {
-      console.error('Error al cargar ingredientes:', err);
+      console.error('Error al cargar datos:', err);
     }
   };
 
   useEffect(() => {
-    cargarIngredientes();
+    cargarDatos();
   }, []);
 
-  // Al escribir o seleccionar del datalist, detectamos si ya existe para sugerir su unidad de medida
+  // Alternar visibilidad de receta (Activar / Desactivar)
+  const handleToggleEstadoReceta = async (id, estadoActual) => {
+    const nuevoEstado = !estadoActual;
+    try {
+      const res = await fetch(`${API_URL}/recetas/${id}/estado`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activa: nuevoEstado })
+      });
+
+      if (!res.ok) throw new Error('Error al actualizar estado');
+
+      setRecetasExistentes((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, activa: nuevoEstado } : r))
+      );
+    } catch (err) {
+      console.error(err);
+      setMensaje({ tipo: 'danger', texto: 'No se pudo cambiar el estado de la receta.' });
+    }
+  };
+
   const handleCambioNombreIngrediente = (val) => {
     setNombreIngredienteInput(val);
     const coincidencia = ingredientesDisponibles.find(
@@ -43,7 +67,6 @@ export function GestionRecetas() {
     }
   };
 
-  // ➕ Agregar ingrediente (crea uno nuevo en la BD si no existe)
   const handleAgregarIngrediente = async () => {
     const nombreLimpio = nombreIngredienteInput.trim();
     const cantVal = parseFloat(cantidadGramos);
@@ -54,7 +77,6 @@ export function GestionRecetas() {
       (i) => i.nombre.toLowerCase() === nombreLimpio.toLowerCase()
     );
 
-    // Si el ingrediente NO existe en la base de datos, lo creamos primero en la tabla ingredientes
     if (!ingObj) {
       try {
         setGuardando(true);
@@ -69,14 +91,12 @@ export function GestionRecetas() {
           })
         });
 
-        if (!res.ok) throw new Error('No se pudo crear el ingrediente');
+        if (!res.ok) throw new Error('Error al crear ingrediente');
         ingObj = await res.json();
-
-        // Actualizamos la lista local de catálogo
         setIngredientesDisponibles((prev) => [...prev, ingObj]);
       } catch (err) {
         console.error(err);
-        setMensaje({ tipo: 'danger', texto: 'Error al guardar el nuevo ingrediente en el inventario.' });
+        setMensaje({ tipo: 'danger', texto: 'Error al registrar el ingrediente.' });
         setGuardando(false);
         return;
       } finally {
@@ -84,7 +104,6 @@ export function GestionRecetas() {
       }
     }
 
-    // Agregar o actualizar en la tabla de la receta actual
     const existeIndex = ingredientesReceta.findIndex((item) => item.ingrediente_id === ingObj.id);
 
     if (existeIndex >= 0) {
@@ -103,40 +122,19 @@ export function GestionRecetas() {
       ]);
     }
 
-    // Resetear formulario de ingrediente
     setNombreIngredienteInput('');
     setCantidadGramos('');
     setUnidadMedidaInput('g');
   };
 
-  // 🗑️ Quitar ingrediente de la lista temporal
   const handleQuitarIngrediente = (id) => {
     setIngredientesReceta(ingredientesReceta.filter((item) => item.ingrediente_id !== id));
   };
 
-  // ✏️ Cambiar cantidad directamente en la tabla
-  const handleCambiarCantidadTabla = (id, nuevaCantidad) => {
-    const val = parseFloat(nuevaCantidad) || 0;
-    setIngredientesReceta(
-      ingredientesReceta.map((item) =>
-        item.ingrediente_id === id ? { ...item, cantidad_requerida: val } : item
-      )
-    );
-  };
-
-  // 💾 Guardar receta completa en PostgreSQL
   const handleGuardarReceta = async (e) => {
     e.preventDefault();
 
-    if (!nombreReceta.trim()) {
-      setMensaje({ tipo: 'warning', texto: 'Ingresa el nombre de la receta.' });
-      return;
-    }
-
-    if (ingredientesReceta.length === 0) {
-      setMensaje({ tipo: 'warning', texto: 'Agrega al menos un ingrediente a la receta.' });
-      return;
-    }
+    if (!nombreReceta.trim() || ingredientesReceta.length === 0) return;
 
     setGuardando(true);
     setMensaje({ tipo: '', texto: '' });
@@ -158,12 +156,13 @@ export function GestionRecetas() {
 
       if (!res.ok) throw new Error('Error al guardar la receta');
 
-      setMensaje({ tipo: 'success', texto: `¡Receta "${nombreReceta}" guardada con éxito!` });
+      setMensaje({ tipo: 'success', texto: `¡Receta "${nombreReceta}" guardada!` });
       setNombreReceta('');
       setIngredientesReceta([]);
+      cargarDatos();
     } catch (err) {
-      console.error('Error al guardar la receta:', err);
-      setMensaje({ tipo: 'danger', texto: 'Error al guardar la receta en el servidor.' });
+      console.error(err);
+      setMensaje({ tipo: 'danger', texto: 'Error al guardar la receta.' });
     } finally {
       setGuardando(false);
     }
@@ -173,9 +172,9 @@ export function GestionRecetas() {
     <Container className="py-2 px-1">
       <Row className="justify-content-center">
         <Col xs={12} lg={9}>
-          <Card className="shadow-sm border-0">
+          <Card className="shadow-sm border-0 mb-4">
             <Card.Header className="bg-dark text-white text-center py-3">
-              <h5 className="mb-0 fw-bold">📖 Crear / Modificar Receta</h5>
+              <h5 className="mb-0 fw-bold">📖 Crear Nueva Receta</h5>
             </Card.Header>
             <Card.Body className="p-3">
               {mensaje.texto && (
@@ -189,7 +188,7 @@ export function GestionRecetas() {
                   <Form.Label className="fw-bold fs-5">Nombre de la Receta</Form.Label>
                   <Form.Control
                     type="text"
-                    placeholder="Ej. Biga, Brioche, Pizza..."
+                    placeholder="Ej. Biga, Brioche..."
                     value={nombreReceta}
                     onChange={(e) => setNombreReceta(e.target.value)}
                     disabled={guardando}
@@ -200,9 +199,8 @@ export function GestionRecetas() {
 
                 <hr />
 
-                <h6 className="fw-bold mb-3">Agregar Ingrediente</h6>
+                <h6 className="fw-bold mb-3">Agregar Ingredientes</h6>
                 <Row className="g-2 mb-3 align-items-end">
-                  {/* Entrada de texto libre con autocompletado datalist */}
                   <Col md={5} xs={12}>
                     <Form.Group>
                       <Form.Label className="small text-muted fw-bold">Ingrediente</Form.Label>
@@ -222,7 +220,6 @@ export function GestionRecetas() {
                     </Form.Group>
                   </Col>
 
-                  {/* Cantidad */}
                   <Col md={3} xs={6}>
                     <Form.Group>
                       <Form.Label className="small text-muted fw-bold">Cantidad</Form.Label>
@@ -237,7 +234,6 @@ export function GestionRecetas() {
                     </Form.Group>
                   </Col>
 
-                  {/* Unidad de medida */}
                   <Col md={2} xs={6}>
                     <Form.Group>
                       <Form.Label className="small text-muted fw-bold">Unidad</Form.Label>
@@ -266,42 +262,25 @@ export function GestionRecetas() {
                   </Col>
                 </Row>
 
-                <h6 className="fw-bold mt-4 mb-2">Ingredientes añadidos a la receta:</h6>
-                {ingredientesReceta.length === 0 ? (
-                  <Alert variant="light" className="text-center border text-muted py-3">
-                    Aún no has agregado ingredientes a esta receta.
-                  </Alert>
-                ) : (
+                {ingredientesReceta.length > 0 && (
                   <Table responsive bordered align="middle" className="mb-4">
                     <thead className="table-light">
                       <tr>
                         <th>Ingrediente</th>
-                        <th style={{ width: '180px' }}>Cantidad</th>
-                        <th style={{ width: '70px' }} className="text-center">Quitar</th>
+                        <th>Cantidad</th>
+                        <th className="text-center">Quitar</th>
                       </tr>
                     </thead>
                     <tbody>
                       {ingredientesReceta.map((item) => (
                         <tr key={item.ingrediente_id}>
                           <td className="fw-bold">{item.nombre}</td>
-                          <td>
-                            <InputGroup size="sm">
-                              <Form.Control
-                                type="number"
-                                step="0.1"
-                                value={item.cantidad_requerida}
-                                onChange={(e) => handleCambiarCantidadTabla(item.ingrediente_id, e.target.value)}
-                                disabled={guardando}
-                              />
-                              <InputGroup.Text>{item.unidad_medida || 'g'}</InputGroup.Text>
-                            </InputGroup>
-                          </td>
+                          <td>{item.cantidad_requerida} {item.unidad_medida}</td>
                           <td className="text-center">
                             <Button
                               variant="outline-danger"
                               size="sm"
                               onClick={() => handleQuitarIngrediente(item.ingrediente_id)}
-                              disabled={guardando}
                             >
                               🗑️
                             </Button>
@@ -319,16 +298,42 @@ export function GestionRecetas() {
                   className="w-100 fw-bold mt-2"
                   disabled={guardando || ingredientesReceta.length === 0}
                 >
-                  {guardando ? (
-                    <>
-                      <Spinner animation="border" size="sm" className="me-2" />
-                      Guardando Receta...
-                    </>
-                  ) : (
-                    '💾 Guardar Receta Completa'
-                  )}
+                  {guardando ? <Spinner animation="border" size="sm" /> : '💾 Guardar Receta'}
                 </Button>
               </Form>
+            </Card.Body>
+          </Card>
+
+          {/* LISTADO Y CONTROL DE ESTADO DE RECETAS */}
+          <Card className="shadow-sm border-0">
+            <Card.Header className="bg-secondary text-white py-2">
+              <h6 className="mb-0 fw-bold">⚙️ Activar / Desactivar Recetas para Producción</h6>
+            </Card.Header>
+            <Card.Body className="p-0">
+              <Table responsive hover className="mb-0 align-middle">
+                <thead className="table-light">
+                  <tr>
+                    <th>Receta</th>
+                    <th className="text-center">Estado Producción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recetasExistentes.map((rec) => (
+                    <tr key={rec.id}>
+                      <td className="fw-bold">{rec.nombre}</td>
+                      <td className="text-center">
+                        <Form.Check
+                          type="switch"
+                          id={`switch-receta-${rec.id}`}
+                          label={rec.activa ? <Badge bg="success">Muestra en Producción</Badge> : <Badge bg="secondary">Oculta</Badge>}
+                          checked={rec.activa}
+                          onChange={() => handleToggleEstadoReceta(rec.id, rec.activa)}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
             </Card.Body>
           </Card>
         </Col>

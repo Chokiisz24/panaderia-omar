@@ -20,7 +20,6 @@ export function RegistroProduccion() {
   const [cantidad, setCantidad] = useState(1);
   const [mensaje, setMensaje] = useState({ tipo: '', texto: '' });
   
-  // 💡 Nuevos estados para feedback visual inmediato
   const [procesando, setProcesando] = useState(false);
   const [mostrarModalExito, setMostrarModalExito] = useState(false);
   const [datosUltimoRegistro, setDatosUltimoRegistro] = useState(null);
@@ -102,7 +101,6 @@ export function RegistroProduccion() {
         })
       });
 
-      // Guardar datos del registro exitoso para la ventana emergente
       setDatosUltimoRegistro({
         nombre: recetaObjeto.nombre,
         cantidad: cantidad
@@ -113,10 +111,8 @@ export function RegistroProduccion() {
         texto: `¡Producción de ${cantidad} x ${recetaObjeto.nombre} registrada correctamente!`
       });
 
-      // Mostrar modal emergente
       setMostrarModalExito(true);
 
-      // Limpieza de formulario
       setCantidad(1);
       setRecetaSeleccionada('');
       setRecetaObjeto(null);
@@ -133,6 +129,9 @@ export function RegistroProduccion() {
     const ing = ingredientes.find((i) => i.id === id);
     return ing ? { nombre: ing.nombre, unidad: ing.unidad_medida } : { nombre: 'Desconocido', unidad: '' };
   };
+
+  // 🔍 Filtro para obtener solo recetas activas
+  const recetasActivas = recetas.filter((r) => r.activa !== false);
 
   return (
     <Container className="py-2">
@@ -164,7 +163,8 @@ export function RegistroProduccion() {
                     disabled={procesando}
                   >
                     <option value="">-- Selecciona una receta --</option>
-                    {recetas.map((r) => (
+                    {/* Renderizamos únicamente las recetas filtradas/activas */}
+                    {recetasActivas.map((r) => (
                       <option key={r.id} value={r.id}>{r.nombre}</option>
                     ))}
                   </Form.Select>
@@ -235,7 +235,6 @@ export function RegistroProduccion() {
         </Col>
       </Row>
 
-      {/* 🟢 MODAL EMERGENTE DE CONFIRMACIÓN */}
       <Modal 
         show={mostrarModalExito} 
         onHide={() => setMostrarModalExito(false)} 
