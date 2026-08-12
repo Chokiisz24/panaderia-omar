@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Form, Button, Card, Alert, Container, Row, Col, ListGroup, Badge, Modal, Spinner } from 'react-bootstrap';
+import { Form, Button, Card, Alert, Container, Row, Col, ListGroup, Badge, Modal, Spinner, InputGroup } from 'react-bootstrap';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const API_URL = `${API_BASE}/api`;
@@ -59,6 +59,17 @@ export function RegistroProduccion() {
     } else {
       setCantidad(1);
     }
+  };
+
+  const incrementarCantidad = () => {
+    setCantidad((prev) => (parseFloat(prev || 0) + 1).toString());
+  };
+
+  const decrementarCantidad = () => {
+    setCantidad((prev) => {
+      const val = parseFloat(prev || 0) - 1;
+      return val > 0 ? val.toString() : '0.1';
+    });
   };
 
   const handleProcesarProduccion = async (e) => {
@@ -180,15 +191,34 @@ export function RegistroProduccion() {
 
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-bold">Número de Recetas a producir</Form.Label>
-                  <Form.Control 
-                    type="number" 
-                    min="0.1" 
-                    step="0.1"
-                    value={cantidad} 
-                    onChange={(e) => setCantidad(e.target.value)}
-                    required
-                    disabled={procesando}
-                  />
+                  <InputGroup>
+                    <Button 
+                      variant="outline-danger" 
+                      onClick={decrementarCantidad}
+                      disabled={procesando || parseFloat(cantidad) <= 0.1}
+                      className="fw-bold fs-5 px-3"
+                    >
+                      -
+                    </Button>
+                    <Form.Control 
+                      type="number" 
+                      min="0.1" 
+                      step="0.1"
+                      value={cantidad} 
+                      onChange={(e) => setCantidad(e.target.value)}
+                      required
+                      disabled={procesando}
+                      className="text-center fw-bold"
+                    />
+                    <Button 
+                      variant="outline-success" 
+                      onClick={incrementarCantidad}
+                      disabled={procesando}
+                      className="fw-bold fs-5 px-3"
+                    >
+                      +
+                    </Button>
+                  </InputGroup>
                 </Form.Group>
 
                 {recetaObjeto && (
