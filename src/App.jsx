@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Container, Nav, Navbar, Card } from 'react-bootstrap';
 import { RegistroProduccion } from './components/RegistroProduccion';
 import { TablaInventario } from './components/TablaInventario';
-import { RegistroMermas } from './components/RegistroMermas';
+import { GestionRecetas } from './components/GestionRecetas';
 import { ResumenProduccion } from './components/ResumenProduccion';
 
 export default function App() {
@@ -22,8 +22,8 @@ export default function App() {
         <Card className="shadow-sm border-0">
           <Card.Body className="p-2">
             {tabActiva === 'produccion' && <RegistroProduccion />}
+            {tabActiva === 'recetas' && <GestionRecetas />}
             {tabActiva === 'inventario' && <TablaInventario />}
-            {tabActiva === 'mermas' && <RegistroMermas />}
             {tabActiva === 'resumen' && <ResumenProduccion />}
           </Card.Body>
         </Card>
@@ -47,6 +47,16 @@ export default function App() {
           </Nav.Link>
 
           <Nav.Link
+            onClick={() => setTabActiva('recetas')}
+            className={`flex-fill py-1 ${
+              tabActiva === 'recetas' ? 'text-primary fw-bold' : 'text-muted'
+            }`}
+          >
+            <div style={{ fontSize: '1.2rem' }}>📖</div>
+            <span style={{ fontSize: '0.75rem' }}>Recetas</span>
+          </Nav.Link>
+
+          <Nav.Link
             onClick={() => setTabActiva('resumen')}
             className={`flex-fill py-1 ${
               tabActiva === 'resumen' ? 'text-primary fw-bold' : 'text-muted'
@@ -64,16 +74,6 @@ export default function App() {
           >
             <div style={{ fontSize: '1.2rem' }}>📦</div>
             <span style={{ fontSize: '0.75rem' }}>Inventario</span>
-          </Nav.Link>
-
-          <Nav.Link
-            onClick={() => setTabActiva('mermas')}
-            className={`flex-fill py-1 ${
-              tabActiva === 'mermas' ? 'text-primary fw-bold' : 'text-muted'
-            }`}
-          >
-            <div style={{ fontSize: '1.2rem' }}>⚠️</div>
-            <span style={{ fontSize: '0.75rem' }}>Mermas</span>
           </Nav.Link>
         </Nav>
       </Navbar>
